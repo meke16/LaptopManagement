@@ -1,19 +1,19 @@
-<?php
+<?php 
 
-// Get the page from URL, default to 'display'
+// manual route...
+
 $url = $_SERVER['REQUEST_URI'];
 
-switch ($url) {
-    case '/display':
-        include 'display.php';
-        break;
+$paths = [
+    '/' => 'home.php',
+    '/home' => 'home.php',
+    '/display' => 'display.php',
 
-    case '/home':
-        include 'home.php';
-        break;
+];
 
-    default:
-        echo "<h1>404 - Page Not Found</h1>";
-        echo $url;
-        break;
+if(array_key_exists($url,$paths)) {
+    require $paths[$url];
+} else {
+    echo "not found";
 }
+

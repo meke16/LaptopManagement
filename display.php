@@ -1,7 +1,6 @@
 <?php
 include 'connect.php';
 session_start();
-$self = $_SERVER['PHP_SELF'];
 $current_year = date('Y'); // Current year for filtering
 
 
@@ -10,7 +9,7 @@ if (isset($_GET['get_student'])) {
     $id = mysqli_real_escape_string($conn, $_GET['id']);
     $sql = "SELECT * FROM students WHERE id = '$id'";
     $result = $conn->query($sql);
-    
+
     if ($result->num_rows > 0) {
         $student = $result->fetch_assoc();
         echo json_encode($student);
@@ -24,33 +23,35 @@ if (isset($_GET['get_student'])) {
  to escape special char and prevent system from
  crashing and I use for input only under control of user */
 
- // Handle form submission
 if (isset($_POST['submit'])) {
-    $name = htmlspecialchars(ucwords(strtolower($_POST['name'])));
-    $sex = $_POST['sex'];
-    $idNumber = mysqli_real_escape_string($conn, $_POST['idNumber']);
-    $department = ucwords(strtolower($_POST['department']));
-    $campus = $_POST['campus']; // Fixed campus name
-    $pcSerialNumber = mysqli_real_escape_string($conn, $_POST['pcSerialNumber']);
-    $pcModel = mysqli_real_escape_string($conn, $_POST['pcModel']);
-    $contact = mysqli_real_escape_string($conn, $_POST['contact']);
-    $year = $_POST['year'];
-    
+    $is_edit = isset($_POST['is_edit']) ? (int)$_POST['is_edit'] : 0;
+    $edit_id = isset($_POST['edit_id']) ? (int)$_POST['edit_id'] : 0;
 
-    // Handle file upload
+    $name = isset($_POST['name']) ? htmlspecialchars(ucwords(strtolower(trim($_POST['name'])))) : '';
+    $sex = isset($_POST['sex']) ? $_POST['sex'] : '';
+    $idNumber = isset($_POST['idNumber']) ? mysqli_real_escape_string($conn, trim($_POST['idNumber'])) : '';
+    $department = isset($_POST['department']) ? $_POST['department'] : '';
+    $campus = isset($_POST['campus']) ? $_POST['campus'] : '';
+    $pcSerialNumber = isset($_POST['pcSerialNumber']) ? mysqli_real_escape_string($conn, trim($_POST['pcSerialNumber'])) : '';
+    $pcModel = isset($_POST['pcModel']) ? mysqli_real_escape_string($conn, trim($_POST['pcModel'])) : '';
+    $contact = isset($_POST['contact']) ? mysqli_real_escape_string($conn, trim($_POST['contact'])) : '';
+    $year = isset($_POST['year']) ? $_POST['year'] : '';
+
+    // Handle file upload (no changes needed)
     $photo = '';
     if (isset($_FILES['photo']) && $_FILES['photo']['error'] == 0) {
         $target_dir = "uploads/";
         if (!file_exists($target_dir)) {
             mkdir($target_dir, 0777, true);
         }
+
         $file_ext = strtolower(pathinfo($_FILES['photo']['name'], PATHINFO_EXTENSION));
         $allowed_ext = ['jpg', 'jpeg', 'png'];
-        
+
         if (in_array($file_ext, $allowed_ext)) {
             $new_filename = uniqid('photo_', true) . '.' . $file_ext;
             $target_file = $target_dir . $new_filename;
-            
+
             if (move_uploaded_file($_FILES['photo']['tmp_name'], $target_file)) {
                 $photo = $target_file;
             }
@@ -58,7 +59,9 @@ if (isset($_POST['submit'])) {
             $_SESSION['error'] = 'Only JPG, JPEG, PNG files are allowed for photo.';
         }
     }
-    $sql_check = "SELECT id FROM `students` WHERE `idNumber` = '$idNumber'";
+
+    // Check if ID number exists
+    $sql_check = "SELECT id FROM students WHERE idNumber = '$idNumber'";
     $result = $conn->query($sql_check);
 
     // Validate inputs
@@ -70,35 +73,51 @@ if (isset($_POST['submit'])) {
         $_SESSION['error'] = 'Department is required.';
     } elseif (empty($pcSerialNumber)) {
         $_SESSION['error'] = 'PC Serial Number is required.';
-    }
-    elseif ($result->num_rows > 0) {
-                $_SESSION['error'] = 'This ID Number already exists in the system!';
-    }
-    else {
-        // Insert new student
-        $sql = $conn->prepare("INSERT INTO students (name, sex, idNumber, department, campus, pcSerialNumber, pcModel, contact, photo, year) 
-                        VALUES (?,?,?,?,?,?,?,?,?,?)");
-        $sql->bind_param("ssssssssss",$name,$sex,$idNumber,$department,$campus,$pcSerialNumber,$pcModel,$contact,$photo,$year);
-                         if ($sql->execute()) {
-                            $_SESSION['success'] = "Student record Added successfully";
-                            header("location: display.php");
-                            exit();
-                        } else {
-                            echo "Error: " . $sql . "<br>" . $conn->error;
-                        }
+    } elseif ($result->num_rows && ($is_edit == 0 || ($is_edit == 1 && $edit_id != $result->fetch_assoc()['id']))) {
+        $_SESSION['error'] = 'This ID Number already exists in the system!';
+    } else {
+        if ($is_edit == 1 && $edit_id > 0) {
+            // Update existing student
+            $sql = $conn->prepare("UPDATE students 
+                SET name=?, sex=?, idNumber=?, department=?, campus=?, pcSerialNumber=?, pcModel=?, contact=?, photo=?, year=? 
+                WHERE id=?");
+            $sql->bind_param("sssssssssii", $name, $sex, $idNumber, $department, $campus, $pcSerialNumber, $pcModel, $contact, $photo, $year, $edit_id);
+
+            if ($sql->execute()) {
+                $_SESSION['success'] = "Student record updated successfully.";
+                header("Location: /display");
+                exit();
+            } else {
+                $_SESSION['error'] = "Error updating record.";
+            }
+        } else {
+            // Insert new student
+            $sql = $conn->prepare("INSERT INTO students (name, sex, idNumber, department, campus, pcSerialNumber, pcModel, contact, photo, year) 
+                                   VALUES (?,?,?,?,?,?,?,?,?,?)");
+            $sql->bind_param("ssssssssss", $name, $sex, $idNumber, $department, $campus, $pcSerialNumber, $pcModel, $contact, $photo, $year);
+
+            if ($sql->execute()) {
+                $_SESSION['success'] = "Student record added successfully.";
+                header("Location: /display");
+                exit();
+            } else {
+                $_SESSION['error'] = "Error inserting record.";
             }
         }
+    }
+}
+
 // Handle delete request
 if (isset($_GET['deleteid'])) {
     $id = mysqli_real_escape_string($conn, $_GET['deleteid']);
-    
+
     $sql = "DELETE  FROM students WHERE id='$id'";
     if ($conn->query($sql) === TRUE) {
         $_SESSION['success'] = "Student record deleted successfully";
     } else {
         $_SESSION['error'] = "Error deleting student record: " . $conn->error;
     }
-    header("Location: $self");
+    header("Location: display");
     exit();
 }
 
@@ -111,9 +130,9 @@ $searchTerms = explode('+', $searchQuery);
 $whereConditions = [];
 
 foreach ($searchTerms as $term) {
-    $term = trim($term); 
+    $term = trim($term);
     if (!empty($term)) {
-        $escapedTerm = mysqli_real_escape_string($conn, $term);  
+        $escapedTerm = mysqli_real_escape_string($conn, $term);
 
         $whereConditions[] = "(name LIKE '%$escapedTerm%' OR idNumber LIKE '%$escapedTerm%')";
     }
@@ -121,7 +140,7 @@ foreach ($searchTerms as $term) {
 
 if (!empty($whereConditions)) {
     $whereSql = implode(' OR ', $whereConditions);
-    
+
     $sql = "SELECT * FROM students WHERE $whereSql ORDER BY name";
 } else {
     $sql = "SELECT * FROM students ORDER BY name";
@@ -136,95 +155,99 @@ if (!$result) {
 $num = 0;
 $department = array(
     // College of Agriculture and Environmental Sciences (CAES)
-"Animal and Range Science",
-"Natural Resources and Environmental Science",
-"Plant Sciences",
-"Agricultural Economics and Agribusiness",
-"Rural Development and Agricultural Extension",
+    "Animal and Range Science",
+    "Natural Resources and Environmental Science",
+    "Plant Sciences",
+    "Agricultural Economics and Agribusiness",
+    "Rural Development and Agricultural Extension",
 
-//College of Business and Economics (CBE)
-"Accounting",
-"Cooperatives",
-"Management",
-"Economics",
-"Public Administration and Development Management",
+    //College of Business and Economics (CBE)
+    "Accounting",
+    "Cooperatives",
+    "Management",
+    "Economics",
+    "Public Administration and Development Management",
 
-//College of Computing and Informatics
-"Computer Science",
-"Information Science",
-"Information Technology",
-"Software Engineering",
-"Statistics",
+    //College of Computing and Informatics
+    "Computer Science",
+    "Information Science",
+    "Information Technology",
+    "Software Engineering",
+    "Statistics",
 
-// College of Education and Behavioral Sciences
-"Pedagogy",
-"Special Needs",
-"Educational Planning and Management",
-"English Language Improvement Centre",
+    // College of Education and Behavioral Sciences
+    "Pedagogy",
+    "Special Needs",
+    "Educational Planning and Management",
+    "English Language Improvement Centre",
 
-// College of Health and Medical Sciences
-"Medicine",
-"Pharmacy",
-"Nursing and Midwifery",
-"Public Health",
-"Environmental Health Sciences",
-"Medical Laboratory Science",
+    // College of Health and Medical Sciences
+    "Medicine",
+    "Pharmacy",
+    "Nursing and Midwifery",
+    "Public Health",
+    "Environmental Health Sciences",
+    "Medical Laboratory Science",
 
-//College of Law
-"Law",
+    //College of Law
+    "Law",
 
-// College of Natural and Computational Sciences
-"Biology",
-"Chemistry",
-"Mathematics",
-"Physics",
+    // College of Natural and Computational Sciences
+    "Biology",
+    "Chemistry",
+    "Mathematics",
+    "Physics",
 
-//College of Social Sciences and Humanities
-"Afan Oromo, Literature and Communication",
-"Gender and Development Studies",
-"Foreign Languages and Journalism",
-"History and Heritage Management",
-"Geography and Environmental Studies",
-"Sociology",
+    //College of Social Sciences and Humanities
+    "Afan Oromo, Literature and Communication",
+    "Gender and Development Studies",
+    "Foreign Languages and Journalism",
+    "History and Heritage Management",
+    "Geography and Environmental Studies",
+    "Sociology",
 
-// College of Veterinary Medicine
-"Veterinary Medicine",
-"Veterinary Laboratory Technology",
+    // College of Veterinary Medicine
+    "Veterinary Medicine",
+    "Veterinary Laboratory Technology",
 
-// Haramaya Institute of Technology
-"Agricultural Engineering",
-"Water Resources and Irrigation Engineering",
-"Civil Engineering",
-"Electrical and Computer Engineering",
-"Mechanical Engineering",
-"Chemical Engineering",
-"Food Science and Post-Harvest Technology",
-"Food Technology and Process Engineering",
+    // Haramaya Institute of Technology
+    "Agricultural Engineering",
+    "Water Resources and Irrigation Engineering",
+    "Civil Engineering",
+    "Electrical and Computer Engineering",
+    "Mechanical Engineering",
+    "Chemical Engineering",
+    "Food Science and Post-Harvest Technology",
+    "Food Technology and Process Engineering",
 
-// Sport Sciences Academy
-"Sport Sciences",
+    // Sport Sciences Academy
+    "Sport Sciences",
 
-// College of Agro-Industry and Land Resources
-"Land Administration",
-"Dairy and Meat Technology",
-"Forest Resource Management",
-"Soil Resources and Watershed Management",
-"aaaaaaa"
+    // College of Agro-Industry and Land Resources
+    "Land Administration",
+    "Dairy and Meat Technology",
+    "Forest Resource Management",
+    "Soil Resources and Watershed Management",
+    "aaaaaaa"
 );
 ?>
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PC Checkup System - Haramaya University</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
     <link rel="stylesheet" href="style.css">
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 </head>
+
 <body>
-<header class="header text-center no-print">
+    <header class="header text-center no-print">
         <h1>PC Checkup System</h1>
         <p style="text-decoration: underline white;" class="lead mt-2">Haramaya University - <?php echo $current_year; ?></p>
     </header>
@@ -232,13 +255,15 @@ $department = array(
         <?php if (isset($_SESSION['error'])): ?>
             <!-- <div class="alert alert-danger text-center"  id="error-message"> -->
             <div class="alert alert-danger text-center error-alert" id="error-message">
-                <?= $_SESSION['error']; unset($_SESSION['error']); ?>
+                <?= $_SESSION['error'];
+                unset($_SESSION['error']); ?>
             </div>
         <?php endif; ?>
-        
+
         <?php if (isset($_SESSION['success'])): ?>
             <div class="alert alert-success text-center success-alert" id="success-message">
-                <?= $_SESSION['success']; unset($_SESSION['success']); ?>
+                <?= $_SESSION['success'];
+                unset($_SESSION['success']); ?>
             </div>
         <?php endif; ?>
 
@@ -257,8 +282,10 @@ $department = array(
             </button>
 
             <div id="studentForm" class="collapse">
-                <form  id="form1"method="POST" class="row g-3 needs-validation" novalidate enctype="multipart/form-data">
+                <form id="form1" method="POST" class="row g-3 needs-validation" novalidate enctype="multipart/form-data">
                     <input type="hidden" name="edit_id" id="edit_id" value="0">
+                    <input type="hidden" name="is_edit" id="is_edit" value="0">
+
                     <div class="col-md-6">
                         <label class="form-label">Full Name</label>
                         <input placeholder="John Doe" type="text" class="form-control" name="name" id="name" required>
@@ -281,10 +308,12 @@ $department = array(
                     </div>
                     <div class="col-md-6">
                         <label class="form-label" for="department">Department</label>
-                        <select class="form-select" name="department" id="department" required>
-                        <option value="">Select a Department</option>
-                            <?php foreach($department as $dep) :?>
-                            <option value="<?= $dep ?>"><?=  $dep ?></option>
+                        <select class="form-select" id="department" name="department" required>
+                            <option value="" selected disabled>Select a Department</option>
+                            <?php foreach ($department as $dep) : ?>
+                                <option value="<?= $dep ?>" <?= (isset($student['department']) && $student['department'] == $dep) ? 'selected' : '' ?>>
+                                    <?= $dep ?>
+                                </option>
                             <?php endforeach; ?>
                         </select>
                         <div class="invalid-feedback">Please select a department.</div>
@@ -315,9 +344,9 @@ $department = array(
                     </div>
                     <div class="col-md-6">
                         <label for="year" class="form-label">Year </label>
-                        <select class="form-select" id="yaer" name="year" required>
+                        <select class="form-select" id="year" name="year" required>
                             <option value="" selected disabled>Select Year</option>
-                            <?php for($i=0; $i<=7; $i++):?>
+                            <?php for ($i = 1; $i <= 7; $i++): ?>
                                 <option value="<?= $i ?>">Year <?= $i ?></option>
                             <?php endfor; ?>
                         </select>
@@ -328,11 +357,8 @@ $department = array(
                         <div class="form-text">Only JPG/PNG images accepted</div>
                     </div>
                     <div class="col-12">
-                        <button type="submit" class="btn btn-success" name="submit">
+                        <button id="change" type="submit" class="btn btn-success" name="submit">
                             <i class="bi bi-save"></i> Save Record
-                        </button>
-                        <button type="button" class="btn btn-danger" onclick="closeForm()">
-                            <i class="bi bi-x"></i> Cancel
                         </button>
                     </div>
                 </form>
@@ -341,7 +367,7 @@ $department = array(
 
         <div class="s   earch-box no-print my-3">
             <form method="POST" class="input-group">
-                <input autocomplete="off" type="search" class="form-control" placeholder="Search by name or ID..." 
+                <input autocomplete="off" type="search" class="form-control" placeholder="Search by name or ID..."
                     name="search_query" value="<?php echo htmlspecialchars($searchQuery); ?>">
                 <button type="submit" class="btn btn-primary" name="search">
                     <i class="bi bi-search"></i> Search
@@ -355,7 +381,7 @@ $department = array(
                     <tr>
                         <th>#</th>
                         <th>Student Name</th>
-                          <th>Photo</th>
+                        <th>Photo</th>
                         <th>Gender</th>
                         <th>Batch</th>
                         <th>ID Number</th>
@@ -363,13 +389,13 @@ $department = array(
                         <th>Campus</th>
                         <th>PC Serial</th>
                         <th class="no-print">PC Model</th>
-                      
+
                         <th class="no-print text-center">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <?php if ($result -> num_rows > 0): 
-                         while ($row = $result->fetch_assoc()):
+                    <?php if ($result->num_rows > 0):
+                        while ($row = $result->fetch_assoc()):
                             $num++;
                             $id = $row['id'];
                             $name = $row['name'];
@@ -381,14 +407,21 @@ $department = array(
                             $pcSerialNumber = $row['pcSerialNumber'];
                             $pcModel = $row['pcModel'];
                             $photo = $row['photo'];
-                            ?>
+                    ?>
                             <tr>
                                 <td><?= $num; ?></td>
                                 <td>
                                     <?= htmlspecialchars($name); ?>
                                 </td>
                                 <td>
-                                  <img style="border-radius: 50%; width:40px" src="<?= htmlspecialchars($photo) ?>" alt="photo">
+                                    <span class="profile-photo-container">
+                                        <i class="fas fa-user-circle profile-photo-icon" aria-hidden="true"></i>
+
+                                        <img src="<?= htmlspecialchars($photo) ?>"
+                                            alt="<?= htmlspecialchars($name) ?>'s photo"
+                                            class="profile-photo-img"
+                                            onerror="this.style.display='none'; this.previousElementSibling.style.display='block';">
+                                    </span>
                                 </td>
                                 <td><?= htmlspecialchars($sex); ?></td>
                                 <td><?= htmlspecialchars($year); ?></td>
@@ -405,17 +438,15 @@ $department = array(
                                 </td>
 
                                 <td class="no-print text-center">
-                                    <button class="btn btn-sm btn-primary" id="off">
-                                        <a  href="update.php?updateid=<?= $id; ?>" class="text-light">
-                                            <i class="bi bi-pencil"></i>
-                                        </a>
+                                    <button class="btn btn-sm btn-primary" onclick="editStudent(<?= $id; ?>)">
+                                        <i class="bi bi-pencil"></i>
                                     </button>
 
                                     <button class="btn btn-sm btn-danger" onclick="confirmDelete(<?= $id; ?>)">
                                         <i class="bi bi-trash"></i>
                                     </button>
                                     <button class="btn btn-sm btn-info" onclick="viewProfile(<?= $id; ?>)">
-                                        <i class="bi bi-info-circle"></i> 
+                                        <i class="bi bi-info-circle"></i>
                                     </button>
                                 </td>
                             </tr>
@@ -427,7 +458,7 @@ $department = array(
                     <?php endif; ?>
                 </tbody>
             </table>
-        </div>
+    </div>
     </div>
 
     <!-- Delete Confirmation Modal section -->
@@ -452,69 +483,195 @@ $department = array(
     <!-- Profile View Overlay section -->
     <div id="profileOverlay" class="overlay">
         <div class="overlay-content">
-        <button style="margin-left: 86%;" class="btn btn-danger mt-1" onclick="closeProfile()">Close</button>
+            <button style="margin-left: 86%;" class="btn btn-danger mt-1" onclick="closeProfile()">Close</button>
             <div id="profileContent"></div>
         </div>
     </div>
     <!-- Footer Section -->
-<footer class="footer">
-    <div class="container">
-        <div class="footer-content">
-            <div class="footer-logo">
-                <h3 class="text-gradient">Haramaya University</h3>
-                <p>Excellence in Education, Research, and Community Service</p>
-                <p><small>PC Checkup Management System</small></p>
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-logo">
+                    <h3 class="text-gradient">Haramaya University</h3>
+                    <p>Excellence in Education, Research, and Community Service</p>
+                    <p><small>PC Checkup Management System</small></p>
+                </div>
+
+                <div class="footer-links">
+                    <h4>Quick Links</h4>
+                    <ul>
+                        <li><a href="home"><i class="bi bi-house-fill"></i> Home</a></li>
+                        <li><a href="display.php"><i class="bi bi-list-check"></i> Records</a></li>
+                        <li><a href="#"><i class="bi bi-info-circle"></i> About</a></li>
+                        <li><a href="#"><i class="bi bi-headset"></i> Support</a></li>
+                    </ul>
+                </div>
+
+                <div class="footer-contact">
+                    <h4>Contact Info</h4>
+                    <p><i class="bi bi-geo-alt-fill"></i> Harar, Ethiopia</p>
+                    <p><i class="bi bi-telephone-fill"></i> +251 (0)25 553 0333</p>
+                    <p><i class="bi bi-envelope-fill"></i> info@haramaya.edu.et</p>
+                    <p><i class="bi bi-globe"></i> www.haramaya.edu.et</p>
+                </div>
             </div>
-            
-            <div class="footer-links">
-                <h4>Quick Links</h4>
-                <ul>
-                    <li><a href="home"><i class="bi bi-house-fill"></i> Home</a></li>
-                    <li><a href="display.php"><i class="bi bi-list-check"></i> Records</a></li>
-                    <li><a href="#"><i class="bi bi-info-circle"></i> About</a></li>
-                    <li><a href="#"><i class="bi bi-headset"></i> Support</a></li>
-                </ul>
-            </div>
-            
-            <div class="footer-contact">
-                <h4>Contact Info</h4>
-                <p><i class="bi bi-geo-alt-fill"></i> Harar, Ethiopia</p>
-                <p><i class="bi bi-telephone-fill"></i> +251 (0)25 553 0333</p>
-                <p><i class="bi bi-envelope-fill"></i> info@haramaya.edu.et</p>
-                <p><i class="bi bi-globe"></i> www.haramaya.edu.et</p>
+
+            <div class="footer-bottom">
+                <p>&copy; <?php echo date('Y'); ?> Haramaya University - PC Checkup System. All rights reserved.</p>
+                <p class="mt-1">Developed with <i class="bi bi-heart-fill text-danger"></i> for Academic Excellence</p>
             </div>
         </div>
-        
-        <div class="footer-bottom">
-            <p>&copy; <?php echo date('Y'); ?> Haramaya University - PC Checkup System. All rights reserved.</p>
-            <p class="mt-1">Developed with <i class="bi bi-heart-fill text-danger"></i> for Academic Excellence</p>
-        </div>
-    </div>
-</footer>
+    </footer>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="main.js"></script>
-    <script> 
-        function closeForm() {
-        const formElement = document.getElementById('studentForm');
-        const collapseInstance = bootstrap.Collapse.getOrCreateInstance(formElement);
-        collapseInstance.hide(); // Collapse it
-    }
-    //to remove alert messages after displayed in defined period of time (mine is 3-second).
-            setTimeout(function() {
-        const alertElement1 = document.getElementById('error-message');
-        const alertElement2 = document.getElementById('success-message');
-        
-        if (alertElement1) {
-            var bootstrapAlert1 = new bootstrap.Alert(alertElement1);
-            bootstrapAlert1.close(); 
+    <script>
+        // View student profile
+        function viewProfile(id) {
+            $.get('', {
+                get_student: 1,
+                id: id
+            }, function(data) {
+                try {
+                    var student = JSON.parse(data);
+                    if (student.error) {
+                        alert(student.error);
+                        return;
+                    }
+
+                    var photo = student.photo || 'assets/default-profile.jpg';
+
+                    var profileHtml = `
+                    <div class="profile-header text-center">
+                        <img src="${photo}" class="profile-img mb-2" alt="Student Photo">
+                        <h3>${student.name}</h3>
+                    </div>
+                    <div class="profile-details">
+                        <div class="row detail-row">
+                            <div class="col-md-4 detail-label">Gender:</div>
+                            <div class="col-md-8">${student.sex}</div>
+                        </div>
+                        <div class="row detail-row">
+                            <div class="col-md-4 detail-label">ID Number:</div>
+                            <div class="col-md-8">${student.idNumber}</div>
+                        </div>
+                        <div class="row detail-row">
+                            <div class="col-md-4 detail-label">Department:</div>
+                            <div class="col-md-8">${student.department}</div>
+                        </div>
+                        <div class="row detail-row">
+                            <div class="col-md-4 detail-label">Batch:</div>
+                            <div class="col-md-8">${student.year}</div>
+                        </div>
+                        <div class="row detail-row">
+                            <div class="col-md-4 detail-label">Campus:</div>
+                            <div class="col-md-8">${student.campus}</div>
+                        </div>
+                        <div class="row detail-row">
+                            <div class="col-md-4 detail-label">PC Serial Number:</div>
+                            <div class="col-md-8">${student.pcSerialNumber}</div>
+                        </div>
+                        <div class="row detail-row">
+                            <div class="col-md-4 detail-label">PC Model:</div>
+                            <div class="col-md-8">${student.pcModel || 'Not specified'}</div>
+                        </div>
+                        <div class="row detail-row">
+                            <div class="col-md-4 detail-label">Contact:</div>
+                            <div class="col-md-8">${student.contact || 'Not provided'}</div>
+                        </div>
+                    </div>
+                `;
+
+                    $('#profileContent').html(profileHtml);
+                    $('#profileOverlay').show();
+                } catch (e) {
+                    console.error('Error parsing student data:', e);
+                    alert('Error loading student profile');
+                }
+            }).fail(function() {
+                alert('Failed to load student profile');
+            });
         }
-        
-        if (alertElement2) {
-            var bootstrapAlert2 = new bootstrap.Alert(alertElement2);
-            bootstrapAlert2.close(); 
+
+        // Close profile view
+        function closeProfile() {
+            $('#profileOverlay').hide();
         }
-    }, 3000); 
-    document.getElementById("form1").onsubmit = function(event) {
+
+
+        // Delete confirmation
+        function confirmDelete(id) {
+            var deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
+            var deleteBtn = document.getElementById('confirmDeleteBtn');
+
+            deleteBtn.href = 'display.php?deleteid=' + id;
+            deleteModal.show();
+        }
+
+        function editStudent(id) {
+            $.get('', {
+                    get_student: 1,
+                    id: id
+                },
+                function(data) {
+
+                    try {
+                        console.log("Editing student ID:", id);
+
+                        const student = JSON.parse(data);
+                        console.log('Data returned:', data);
+                        if (student.error) {
+                            alert(student.error);
+                            return;
+                        }
+                        // Populate form with student data
+                        $('#edit_id').val(student.id);
+                        $('#is_edit').val(1);
+                        $('#name').val(student.name);
+                        $('#sex').val(student.sex);
+                        $('#idNumber').val(student.idNumber);
+                        $('#department').val(student.department);
+                        $('#campus').val(student.campus);
+                        $('#pcSerialNumber').val(student.pcSerialNumber);
+                        $('#pcModel').val(student.pcModel);
+                        $('#contact').val(student.contact);
+                        $('#year').val(student.year);
+
+
+                        $('#studentForm').collapse('show');
+
+                        // Scroll to the form
+                        $('html, body').animate({
+                            scrollTop: $('#studentForm').fadeIn()
+                        }, 500);
+
+                        // Change form title
+                        $('#toggleFormBtn').html('<i class="bi bi-pencil"></i> Edit Student');
+                        $('#change').html('<i class="bi bi-pencil"></i> Save Changes');
+
+
+
+
+                    } catch (e) {
+                        console.error('Error parsing student data:', e);
+                        alert('Error loading student data');
+                    }
+                });
+        }
+        //to remove alert messages after displayed in defined period of time (mine is 3-second).
+        setTimeout(function() {
+            const alertElement1 = document.getElementById('error-message');
+            const alertElement2 = document.getElementById('success-message');
+
+            if (alertElement1) {
+                var bootstrapAlert1 = new bootstrap.Alert(alertElement1);
+                bootstrapAlert1.close();
+            }
+
+            if (alertElement2) {
+                var bootstrapAlert2 = new bootstrap.Alert(alertElement2);
+                bootstrapAlert2.close();
+            }
+        }, 3000);
+        document.getElementById("form1").onsubmit = function(event) {
             var idNumber = document.getElementById("idNumber").value;
             if (idNumber.length < 4) {
                 alert("The ID number must be at least 4 characters long.");
@@ -522,6 +679,7 @@ $department = array(
             }
         };
     </script>
-    </body>
 </body>
+</body>
+
 </html>

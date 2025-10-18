@@ -3,11 +3,33 @@ include 'connect.php';
 session_start();
 $current_year = date('Y'); // Current year for filtering
 
+$limit = 10; // Number of records to show per page
+// --- 1. DETERMINE CURRENT PAGE ---
+// Get the current page number from the URL, default to 1
+$page = isset($_GET['page']) && is_numeric($_GET['page']) ? (int)$_GET['page'] : 1;
+// Ensure the page number is at least 1
+$page = max(1, $page);
+// --- 2. CALCULATE TOTAL RECORDS ---
+$total_result = $conn->query("SELECT COUNT(id) AS total FROM student");
+$total_row = $total_result->fetch_assoc();
+$total_records = $total_row['total'];
+
+// --- 3. CALCULATE TOTAL PAGES ---
+$total_pages = ceil($total_records / $limit);
+// Adjust page if it exceeds total pages
+$page = min($page, $total_pages);
+
+// --- 4. CALCULATE OFFSET (SQL STARTING POINT) ---
+$offset = ($page - 1) * $limit;
+
+// --- 5. EXECUTE PAGINATED QUERY ---
+$sql = "SELECT * FROM student ORDER BY id DESC LIMIT $limit OFFSET $offset";
+$result = $conn->query($sql);
 
 // Handle AJAX student data request (for info)
 if (isset($_GET['get_student'])) {
     $id = mysqli_real_escape_string($conn, $_GET['id']);
-    $sql = "SELECT * FROM students WHERE id = '$id'";
+    $sql = "SELECT * FROM student WHERE id = '$id'";
     $result = $conn->query($sql);
 
     if ($result->num_rows > 0) {
@@ -61,7 +83,7 @@ if (isset($_POST['submit'])) {
     }
 
     // Check if ID number exists
-    $sql_check = "SELECT id FROM students WHERE idNumber = '$idNumber'";
+    $sql_check = "SELECT id FROM student WHERE idNumber = '$idNumber'";
     $result = $conn->query($sql_check);
 
     // Validate inputs
@@ -78,7 +100,7 @@ if (isset($_POST['submit'])) {
     } else {
         if ($is_edit == 1 && $edit_id > 0) {
             // Update existing student
-            $sql = $conn->prepare("UPDATE students 
+            $sql = $conn->prepare("UPDATE student 
                 SET name=?, sex=?, idNumber=?, department=?, campus=?, pcSerialNumber=?, pcModel=?, contact=?, photo=?, year=? 
                 WHERE id=?");
             $sql->bind_param("sssssssssii", $name, $sex, $idNumber, $department, $campus, $pcSerialNumber, $pcModel, $contact, $photo, $year, $edit_id);
@@ -92,7 +114,7 @@ if (isset($_POST['submit'])) {
             }
         } else {
             // Insert new student
-            $sql = $conn->prepare("INSERT INTO students (name, sex, idNumber, department, campus, pcSerialNumber, pcModel, contact, photo, year) 
+            $sql = $conn->prepare("INSERT INTO student (name, sex, idNumber, department, campus, pcSerialNumber, pcModel, contact, photo, year) 
                                    VALUES (?,?,?,?,?,?,?,?,?,?)");
             $sql->bind_param("ssssssssss", $name, $sex, $idNumber, $department, $campus, $pcSerialNumber, $pcModel, $contact, $photo, $year);
 
@@ -111,7 +133,7 @@ if (isset($_POST['submit'])) {
 if (isset($_GET['deleteid'])) {
     $id = mysqli_real_escape_string($conn, $_GET['deleteid']);
 
-    $sql = "DELETE  FROM students WHERE id='$id'";
+    $sql = "DELETE  FROM student WHERE id='$id'";
     if ($conn->query($sql) === TRUE) {
         $_SESSION['success'] = "Student record deleted successfully";
     } else {
@@ -121,37 +143,62 @@ if (isset($_GET['deleteid'])) {
     exit();
 }
 
+// --- SEARCH LOGIC ---
 $searchQuery = '';
+$whereSql = '';
 if (isset($_POST['search']) && !empty(trim($_POST['search_query']))) {
     $searchQuery = trim($_POST['search_query']);
-    $searchQuery = ucwords(strtolower($searchQuery));
-}
-$searchTerms = explode('+', $searchQuery);
-$whereConditions = [];
+    // Keep search query format consistent for display and use
+    $searchQueryDisplay = ucwords(strtolower($searchQuery));
 
-foreach ($searchTerms as $term) {
-    $term = trim($term);
-    if (!empty($term)) {
-        $escapedTerm = mysqli_real_escape_string($conn, $term);
+    // Build WHERE clause
+    $searchTerms = explode('+', $searchQuery);
+    $whereConditions = [];
 
-        $whereConditions[] = "(name LIKE '%$escapedTerm%' OR idNumber LIKE '%$escapedTerm%')";
+    foreach ($searchTerms as $term) {
+        $term = trim($term);
+        if (!empty($term)) {
+            // Use prepared statements for complex logic or mysqli_real_escape_string for simple, manual escaping
+            $escapedTerm = mysqli_real_escape_string($conn, $term);
+            $whereConditions[] = "(name LIKE '%$escapedTerm%' OR idNumber LIKE '%$escapedTerm%')";
+        }
+    }
+
+    if (!empty($whereConditions)) {
+        $whereSql = "WHERE " . implode(' OR ', $whereConditions);
     }
 }
-
-if (!empty($whereConditions)) {
-    $whereSql = implode(' OR ', $whereConditions);
-
-    $sql = "SELECT * FROM students WHERE $whereSql ORDER BY name";
-} else {
-    $sql = "SELECT * FROM students ORDER BY name";
+$search_param = '';
+if (!empty($searchQuery)) {
+    // URL-encode the search query for use in links
+    $search_param = '&search_query=' . urlencode($searchQuery) . '&search=1';
 }
+// --- PAGINATION LOGIC ---
 
-$result = mysqli_query($conn, $sql);
+// 1. DETERMINE CURRENT PAGE
+$page = isset($_GET['page']) && is_numeric($_GET['page']) ? (int)$_GET['page'] : 1;
+$page = max(1, $page);
+
+// 2. CALCULATE TOTAL RECORDS (MUST incorporate search)
+$total_result_query = "SELECT COUNT(id) AS total FROM student " . $whereSql;
+$total_result = $conn->query($total_result_query);
+$total_row = $total_result->fetch_assoc();
+$total_records = $total_row['total'];
+
+// 3. CALCULATE TOTAL PAGES
+$total_pages = $total_records > 0 ? ceil($total_records / $limit) : 1;
+$page = min($page, $total_pages); // Adjust page if it exceeds total pages
+
+// 4. CALCULATE OFFSET (SQL STARTING POINT)
+$offset = ($page - 1) * $limit;
+
+// 5. EXECUTE PAGINATED QUERY (MUST incorporate search)
+$sql = "SELECT * FROM student $whereSql ORDER BY id DESC LIMIT $limit OFFSET $offset";
+$result = $conn->query($sql);
 
 if (!$result) {
-    die('Error executing query: ' . mysqli_error($conn));
+    die('Error executing paginated query: ' . $conn->error);
 }
-
 $num = 0;
 $department = array(
     // College of Agriculture and Environmental Sciences (CAES)
@@ -242,15 +289,49 @@ $department = array(
     <!-- Font Awesome CDN -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=<?= time() ?>">
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 </head>
 
 <body>
+
     <header class="header text-center no-print">
         <h1>PC Checkup System</h1>
         <p style="text-decoration: underline white;" class="lead mt-2">Haramaya University - <?php echo $current_year; ?></p>
     </header>
+
+    <div class="d-flex justify-content-center align-items-center flex-wrap my-3 no-print">
+
+
+        <nav aria-label="Page navigation" class="order-2 order-md-2">
+            <ul class="pagination pagination-sm mb-0">
+
+                <li class="page-item <?= ($page <= 1) ? 'disabled' : ''; ?>">
+                    <a class="page-link" href="?page=1<?= $search_param; ?>" aria-label="First">
+                        <span aria-hidden="true">&laquo;</span>
+                    </a>
+                </li>
+
+                <li class="page-item <?= ($page <= 1) ? 'disabled' : ''; ?>">
+                    <a class="page-link" href="?page=<?= $page - 1; ?><?= $search_param; ?>">Previous</a>
+                </li>
+
+                <li class="page-item <?= ($page >= $total_pages) ? 'disabled' : ''; ?>">
+                    <a class="page-link" href="?page=<?= $page + 1; ?><?= $search_param; ?>">Next</a>
+                </li>
+
+                <li class="page-item <?= ($page >= $total_pages) ? 'disabled' : ''; ?>">
+                    <a class="page-link" href="?page=<?= $total_pages; ?><?= $search_param; ?>" aria-label="Last">
+                        <span aria-hidden="true">&raquo;</span>
+                    </a>
+                </li>
+            </ul>
+        </nav>
+    </div>
+    <div class="text-center text-white small mt-2 no-print">
+        Showing records <?= $total_records > 0 ? $offset + 1 : 0; ?> - <?= min($offset + $limit, $total_records); ?> of <?= $total_records; ?>
+    </div>
+
     <div class="container">
         <?php if (isset($_SESSION['error'])): ?>
             <!-- <div class="alert alert-danger text-center"  id="error-message"> -->
@@ -453,7 +534,25 @@ $department = array(
                         <?php endwhile; ?>
                     <?php else: ?>
                         <tr>
-                            <td colspan="8" class="text-center">No PC checkup records found for <?php echo $current_year; ?>.</td>
+                            <td colspan="11">
+                                <div class="alert alert-secondary text-center my-3 py-3" role="alert">
+                                    <h5 class="alert-heading text-secondary">
+                                        <i class="bi bi-calendar-x-fill me-2"></i> No Checkup Data Available
+                                    </h5>
+                                    <p class="mb-2">
+                                        No PC checkup records found
+                                        <?php if (!empty($searchQuery)): ?>
+                                            matching "<strong><?= htmlspecialchars($searchQueryDisplay); ?></strong>".
+                                        <?php else: ?>
+                                            for the system.
+                                        <?php endif; ?>
+                                    </p>
+                                    <hr>
+                                    <p class="mb-0 small text-muted">
+                                        To begin tracking, use the **"Add New Record"** button above.
+                                    </p>
+                                </div>
+                            </td>
                         </tr>
                     <?php endif; ?>
                 </tbody>

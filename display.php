@@ -275,7 +275,6 @@ $department = array(
     "Dairy and Meat Technology",
     "Forest Resource Management",
     "Soil Resources and Watershed Management",
-    "aaaaaaa"
 );
 ?>
 <!DOCTYPE html>
@@ -357,13 +356,13 @@ $department = array(
             </button>
         </div>
 
-        <div class="form-container">
+        <div  style="background: #0f0e0eff;" class="form-container">
             <button id="toggleFormBtn" class="btn btn-primary mb-4 no-print" data-bs-toggle="collapse" data-bs-target="#studentForm">
                 <i class="bi bi-person-plus"></i> Add New Record
             </button>
 
             <div id="studentForm" class="collapse">
-                <form id="form1" method="POST" class="row g-3 needs-validation" novalidate enctype="multipart/form-data">
+                <form autocomplete="off" id="form1" method="POST" class="row g-3 needs-validation" novalidate enctype="multipart/form-data">
                     <input type="hidden" name="edit_id" id="edit_id" value="0">
                     <input type="hidden" name="is_edit" id="is_edit" value="0">
 
@@ -446,9 +445,9 @@ $department = array(
             </div>
         </div>
 
-        <div class="s   earch-box no-print my-3">
+        <div  class="search-box no-print my-3">
             <form method="POST" class="input-group">
-                <input autocomplete="off" type="search" class="form-control" placeholder="Search by name or ID..."
+                <input style="background: #e27917ff;" autocomplete="off" type="search" class="form-control" placeholder="Search by name or ID..."
                     name="search_query" value="<?php echo htmlspecialchars($searchQuery); ?>">
                 <button type="submit" class="btn btn-primary" name="search">
                     <i class="bi bi-search"></i> Search
@@ -456,7 +455,7 @@ $department = array(
             </form>
         </div>
 
-        <di$v class="table-responsive cl1">
+        <div class="table-responsive cl1">
             <table class="table table-hover zoom-table">
                 <thead class="table-dark">
                     <tr>
@@ -474,7 +473,7 @@ $department = array(
                         <th class="no-print text-center">Actions</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody class="table-dark">
                     <?php if ($result->num_rows > 0):
                         while ($row = $result->fetch_assoc()):
                             $num++;

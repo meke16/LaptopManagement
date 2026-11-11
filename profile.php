@@ -62,7 +62,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <label class="form-label" for="confirm_password">Confirm new password</label>
                 <input class="form-control mb-4" id="confirm_password" name="confirm_password" type="password" minlength="6">
                 <button class="btn btn-primary" type="submit">Save changes</button>
-                <a class="btn btn-secondary" href="/display">Cancel</a>
+                <a class="btn btn-secondary" href="display.php">Cancel</a>
             </form>
         </div>
     </main>

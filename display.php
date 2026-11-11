@@ -128,7 +128,7 @@ if (isset($_POST['submit'])) {
 
             if ($sql->execute()) {
                 $_SESSION['success'] = "Student record updated successfully.";
-                header("Location: /display");
+                header("Location: display.php");
                 exit();
             } else {
                 $_SESSION['error'] = "Error updating record.";
@@ -141,7 +141,7 @@ if (isset($_POST['submit'])) {
 
             if ($sql->execute()) {
                 $_SESSION['success'] = "Student record added successfully.";
-                header("Location: /display");
+                header("Location: display.php");
                 exit();
             } else {
                 $_SESSION['error'] = "Error inserting record.";
@@ -160,7 +160,7 @@ if (isset($_GET['deleteid'])) {
     } else {
         $_SESSION['error'] = "Error deleting student record: " . $conn->error;
     }
-    header("Location: display");
+    header("Location: display.php");
     exit();
 }
 
@@ -373,10 +373,10 @@ $department = array(
                 <i class="bi bi-arrow-left"></i> Go Back
             </a>
             <div class="d-flex gap-2">
-                <a href="/profile" class="btn btn-outline-light">
+                <a href="profile.php" class="btn btn-outline-light">
                     <i class="bi bi-person-gear"></i> Edit Profile
                 </a>
-                <a href="/logout" class="btn btn-outline-danger">
+                <a href="logout.php" class="btn btn-outline-danger">
                     <i class="bi bi-box-arrow-right"></i> Log out
                 </a>
                 <button class="btn btn-primary" onclick="window.print()">
@@ -851,7 +851,7 @@ $department = array(
             clearTimeout(searchTimer);
             const query = searchInput.value.trim();
             searchTimer = setTimeout(function() {
-                fetch("display?live_search=1&query=" + encodeURIComponent(query), {
+                fetch("display.php?live_search=1&query=" + encodeURIComponent(query), {
                     headers: { "Accept": "application/json" }
                 })
                     .then(function(response) {

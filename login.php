@@ -5,7 +5,7 @@ require_once __DIR__ . '/connect.php';
 require_once __DIR__ . '/auth.php';
 
 if (is_authenticated()) {
-    header('Location: /display');
+    header('Location: display.php');
     exit();
 }
 
@@ -21,7 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         session_regenerate_id(true);
         $_SESSION['user_id'] = (int)$user['id'];
         $_SESSION['user_email'] = $user['email'];
-        header('Location: /display');
+        header('Location: display.php');
         exit();
     }
     $error = 'Invalid email or password.';
@@ -49,7 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <input class="form-control mb-4" id="password" name="password" type="password" required>
                 <button class="btn btn-primary w-100" type="submit">Log in</button>
             </form>
-            <a class="btn btn-link mt-2" href="/home">Back to home</a>
+            <a class="btn btn-link mt-2" href="home.php">Back to home</a>
         </div>
     </main>
 </body>

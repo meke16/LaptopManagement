@@ -75,7 +75,7 @@ if (array_key_exists($url, $routes)) {
                 <h1>404</h1>
                 <p>Oops! The page you are looking for <strong><?= htmlspecialchars($url) ?></strong> does not exist.</p>
                 <p>Don't worry, you can go back to the home page.</p>
-                <a href="/home" class="btn-home">Go to Home</a>
+                <a href="home.php" class="btn-home">Go to Home</a>
             </div>
         </body>
         </html>

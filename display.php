@@ -370,7 +370,7 @@ $department = array(
         <?php endif; ?>
 
         <div class="d-flex justify-content-between align-items-center gap-2 mb-4 no-print buto1">
-            <a href="home" class="btn btn-secondary">
+            <a href="home.php" class="btn btn-secondary">
                 <i class="bi bi-arrow-left"></i> Go Back
             </a>
             <div class="d-flex gap-2">

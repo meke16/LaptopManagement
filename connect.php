@@ -101,17 +101,37 @@ try {
     $conn->exec(
         'CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE,
             email TEXT NOT NULL UNIQUE,
             password TEXT NOT NULL,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         )'
     );
 
-    $seed = $conn->pdo()->prepare('SELECT id FROM users WHERE email = ?');
-    $seed->execute(['admin@gmail.com']);
+    $columns = $conn->pdo()->query('PRAGMA table_info(users)')->fetchAll(PDO::FETCH_ASSOC);
+    $hasUsername = false;
+    foreach ($columns as $column) {
+        if ($column['name'] === 'username') {
+            $hasUsername = true;
+            break;
+        }
+    }
+    if (!$hasUsername) {
+        $conn->pdo()->exec('ALTER TABLE users ADD COLUMN username TEXT');
+    }
+    $conn->pdo()->exec(
+        "UPDATE users SET username = CASE
+            WHEN email = 'admin@gmail.com' THEN 'admin'
+            ELSE COALESCE(username, replace(email, '@', '_'))
+        END
+        WHERE username IS NULL OR username = ''"
+    );
+
+    $seed = $conn->pdo()->prepare('SELECT id FROM users WHERE username = ?');
+    $seed->execute(['admin']);
     if (!$seed->fetch()) {
-        $insertUser = $conn->pdo()->prepare('INSERT INTO users (email, password) VALUES (?, ?)');
-        $insertUser->execute(['admin@gmail.com', password_hash('password', PASSWORD_DEFAULT)]);
+        $insertUser = $conn->pdo()->prepare('INSERT INTO users (username, email, password) VALUES (?, ?, ?)');
+        $insertUser->execute(['admin', 'admin@gmail.com', password_hash('password', PASSWORD_DEFAULT)]);
     }
 } catch (PDOException $exception) {
     http_response_code(500);

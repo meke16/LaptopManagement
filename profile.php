@@ -7,7 +7,7 @@ require_auth();
 
 $error = '';
 $success = '';
-$currentUser = $conn->pdo()->prepare('SELECT id, email FROM users WHERE id = ?');
+$currentUser = $conn->pdo()->prepare('SELECT id, username FROM users WHERE id = ?');
 $currentUser->execute([(int)$_SESSION['user_id']]);
 $user = $currentUser->fetch();
 
@@ -18,15 +18,15 @@ if (!$user) {
 }
 
 $_SESSION['user_id'] = (int)$user['id'];
-$_SESSION['user_email'] = $user['email'];
+$_SESSION['username'] = $user['username'];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $email = trim((string)($_POST['email'] ?? ''));
+    $username = trim((string)($_POST['username'] ?? ''));
     $password = (string)($_POST['password'] ?? '');
     $confirmPassword = (string)($_POST['confirm_password'] ?? '');
 
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $error = 'Please enter a valid email address.';
+    if (!preg_match('/^[A-Za-z0-9._-]{3,50}$/', $username)) {
+        $error = 'Username must be 3-50 characters and use only letters, numbers, dots, underscores, or hyphens.';
     } elseif ($password !== '' && strlen($password) < 6) {
         $error = 'Password must be at least 6 characters long.';
     } elseif ($password !== $confirmPassword) {
@@ -35,24 +35,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             $conn->pdo()->beginTransaction();
             if ($password === '') {
-                $statement = $conn->pdo()->prepare('UPDATE users SET email = ? WHERE id = ?');
-                $statement->execute([$email, $user['id']]);
+                $statement = $conn->pdo()->prepare('UPDATE users SET username = ? WHERE id = ?');
+                $statement->execute([$username, $user['id']]);
             } else {
-                $statement = $conn->pdo()->prepare('UPDATE users SET email = ?, password = ? WHERE id = ?');
-                $statement->execute([$email, password_hash($password, PASSWORD_DEFAULT), $user['id']]);
+                $statement = $conn->pdo()->prepare('UPDATE users SET username = ?, password = ? WHERE id = ?');
+                $statement->execute([$username, password_hash($password, PASSWORD_DEFAULT), $user['id']]);
             }
-            if ($statement->rowCount() === 0 && $email !== $user['email']) {
+            if ($statement->rowCount() === 0 && $username !== $user['username']) {
                 throw new RuntimeException('The current user account could not be updated.');
             }
             $conn->pdo()->commit();
-            $_SESSION['user_email'] = $email;
+            $_SESSION['username'] = $username;
             $success = 'Profile updated successfully.';
         } catch (Throwable $exception) {
             if ($conn->pdo()->inTransaction()) {
                 $conn->pdo()->rollBack();
             }
             $error = $exception instanceof PDOException && strpos(strtolower($exception->getMessage()), 'unique') !== false
-                ? 'That email address is already in use.'
+                ? 'That username is already in use.'
                 : 'Unable to update the current profile.';
         }
     }
@@ -73,8 +73,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <?php if ($error): ?><div class="alert alert-danger"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></div><?php endif; ?>
             <?php if ($success): ?><div class="alert alert-success"><?= htmlspecialchars($success, ENT_QUOTES, 'UTF-8') ?></div><?php endif; ?>
             <form method="post" autocomplete="off">
-                <label class="form-label" for="email">Email</label>
-                <input class="form-control mb-3" id="email" name="email" type="email" value="<?= htmlspecialchars($user['email'], ENT_QUOTES, 'UTF-8') ?>" required>
+                <label class="form-label" for="username">Username</label>
+                <input class="form-control mb-3" id="username" name="username" type="text" value="<?= htmlspecialchars($user['username'], ENT_QUOTES, 'UTF-8') ?>" required>
                 <label class="form-label" for="password">New password</label>
                 <input class="form-control mb-3" id="password" name="password" type="password" minlength="6">
                 <label class="form-label" for="confirm_password">Confirm new password</label>

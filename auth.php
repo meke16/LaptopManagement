@@ -7,7 +7,7 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
 
 function is_authenticated(): bool
 {
-    return isset($_SESSION['user_id'], $_SESSION['user_email']);
+    return isset($_SESSION['user_id'], $_SESSION['username']);
 }
 
 function require_auth(): void

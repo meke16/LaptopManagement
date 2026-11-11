@@ -11,20 +11,20 @@ if (is_authenticated()) {
 
 $error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $email = trim((string)($_POST['email'] ?? ''));
+    $username = trim((string)($_POST['username'] ?? ''));
     $password = (string)($_POST['password'] ?? '');
-    $statement = $conn->pdo()->prepare('SELECT id, email, password FROM users WHERE email = ?');
-    $statement->execute([$email]);
+    $statement = $conn->pdo()->prepare('SELECT id, username, password FROM users WHERE username = ?');
+    $statement->execute([$username]);
     $user = $statement->fetch();
 
     if ($user && password_verify($password, $user['password'])) {
         session_regenerate_id(true);
         $_SESSION['user_id'] = (int)$user['id'];
-        $_SESSION['user_email'] = $user['email'];
+        $_SESSION['username'] = $user['username'];
         header('Location: display.php');
         exit();
     }
-    $error = 'Invalid email or password.';
+    $error = 'Invalid username or password.';
 }
 ?>
 <!DOCTYPE html>
@@ -43,8 +43,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <div class="alert alert-danger"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></div>
             <?php endif; ?>
             <form method="post" autocomplete="off">
-                <label class="form-label" for="email">Email</label>
-                <input class="form-control mb-3" id="email" name="email" type="email" required autofocus>
+                <label class="form-label" for="username">Username</label>
+                <input class="form-control mb-3" id="username" name="username" type="text" required autofocus>
                 <label class="form-label" for="password">Password</label>
                 <input class="form-control mb-4" id="password" name="password" type="password" required>
                 <button class="btn btn-primary w-100" type="submit">Log in</button>

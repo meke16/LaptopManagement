@@ -51,7 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($conn->pdo()->inTransaction()) {
                 $conn->pdo()->rollBack();
             }
-            $error = $exception instanceof PDOException && str_contains(strtolower($exception->getMessage()), 'unique')
+            $error = $exception instanceof PDOException && strpos(strtolower($exception->getMessage()), 'unique') !== false
                 ? 'That email address is already in use.'
                 : 'Unable to update the current profile.';
         }

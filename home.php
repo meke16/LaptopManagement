@@ -22,19 +22,6 @@ $current_year = date('Y');
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
             </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav ms-auto">
-                    <li class="nav-item">
-                        <a class="nav-link active" href="home">Home</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="#about">About</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="#contact">Contact</a>
-                    </li>
-                </ul>
-            </div>
         </div>
     </nav>
 
@@ -186,15 +173,6 @@ $current_year = date('Y');
                     <h3 class="text-gradient">Haramaya University</h3>
                     <p>Excellence in Education, Research, and Community Service</p>
                     <p><small>PC Checkup Management System</small></p>
-                </div>
-                
-                <div class="footer-links">
-                    <h4>Quick Links</h4>
-                    <ul>
-                        <li><a href="home"><i class="bi bi-house-fill"></i> Home</a></li>
-                        <li><a href="#"><i class="bi bi-info-circle"></i> About</a></li>
-                        <li><a href="#"><i class="bi bi-headset"></i> Support</a></li>
-                    </ul>
                 </div>
                 
                 <div class="footer-contact">

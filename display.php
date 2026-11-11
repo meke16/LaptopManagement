@@ -5,6 +5,26 @@ require_auth();
 $current_year = date('Y'); // Current year for filtering
 
 $limit = 10; // Number of records to show per page
+
+if (isset($_GET['live_search'])) {
+    $query = trim((string)($_GET['query'] ?? ''));
+    $terms = array_values(array_filter(array_map('trim', explode('+', $query))));
+    $conditions = [];
+    $parameters = [];
+    foreach ($terms as $term) {
+        $conditions[] = '(name LIKE ? OR idNumber LIKE ?)';
+        $parameters[] = '%' . $term . '%';
+        $parameters[] = '%' . $term . '%';
+    }
+
+    $where = $conditions ? 'WHERE ' . implode(' OR ', $conditions) : '';
+    $statement = $conn->pdo()->prepare("SELECT * FROM student $where ORDER BY id DESC LIMIT 100");
+    $statement->execute($parameters);
+    $records = $statement->fetchAll();
+    header('Content-Type: application/json');
+    echo json_encode(['records' => $records, 'total' => count($records)]);
+    exit();
+}
 // --- 1. DETERMINE CURRENT PAGE ---
 // Get the current page number from the URL, default to 1
 $page = isset($_GET['page']) && is_numeric($_GET['page']) ? (int)$_GET['page'] : 1;
@@ -328,7 +348,7 @@ $department = array(
             </ul>
         </nav>
     </div>
-    <div class="text-center text-white small mt-2 no-print">
+    <div id="recordsSummary" class="records-summary text-center small mt-2 no-print">
         Showing records <?= $total_records > 0 ? $offset + 1 : 0; ?> - <?= min($offset + $limit, $total_records); ?> of <?= $total_records; ?>
     </div>
 
@@ -469,12 +489,10 @@ $department = array(
         </div>
 
         <div  class="search-box no-print my-3">
-            <form method="POST" class="input-group">
+            <form id="searchForm" method="POST" class="input-group">
                 <input autocomplete="off" type="search" class="form-control" placeholder="Search by name or ID..."
                     name="search_query" value="<?php echo htmlspecialchars($searchQuery); ?>">
-                <button type="submit" class="btn btn-primary" name="search">
-                    <i class="bi bi-search"></i> Search
-                </button>
+                <span class="search-icon" aria-hidden="true"><i class="bi bi-search"></i></span>
             </form>
         </div>
 
@@ -496,7 +514,7 @@ $department = array(
                         <th class="no-print text-center">Actions</th>
                     </tr>
                 </thead>
-                <tbody class="table-dark">
+                <tbody id="recordsBody" class="table-dark">
                     <?php if ($result->num_rows > 0):
                         while ($row = $result->fetch_assoc()):
                             $num++;
@@ -762,6 +780,95 @@ $department = array(
             document.getElementById("studentModalLabel").innerHTML = '<i class="bi bi-person-plus me-2"></i>Add New Record';
             document.getElementById("change").innerHTML = '<i class="bi bi-save"></i> Save Record';
             document.getElementById("form1").classList.remove("was-validated");
+        });
+
+        const searchForm = document.getElementById("searchForm");
+        const searchInput = searchForm.querySelector('input[name="search_query"]');
+        const recordsBody = document.getElementById("recordsBody");
+        const recordsSummary = document.getElementById("recordsSummary");
+        const pagination = document.querySelector(".pagination");
+        let searchTimer;
+
+        function escapeHtml(value) {
+            return String(value ?? "").replace(/[&<>"']/g, function(character) {
+                return {
+                    "&": "&amp;",
+                    "<": "&lt;",
+                    ">": "&gt;",
+                    '"': "&quot;",
+                    "'": "&#039;"
+                }[character];
+            });
+        }
+
+        function renderLiveRecords(records) {
+            if (!records.length) {
+                recordsBody.innerHTML = `
+                    <tr><td colspan="11">
+                        <div class="alert alert-secondary text-center my-3 py-3">
+                            <h5 class="alert-heading text-secondary"><i class="bi bi-search me-2"></i>No matching records</h5>
+                            <p class="mb-0">Try a different name or ID number.</p>
+                        </div>
+                    </td></tr>`;
+                return;
+            }
+
+            recordsBody.innerHTML = records.map(function(record, index) {
+                const photo = escapeHtml(record.photo || "");
+                const name = escapeHtml(record.name);
+                return `
+                    <tr>
+                        <td>${index + 1}</td>
+                        <td>${name}</td>
+                        <td>
+                            <span class="profile-photo-container">
+                                <i class="fas fa-user-circle profile-photo-icon" aria-hidden="true"></i>
+                                <img src="${photo}" alt="${name}'s photo" class="profile-photo-img"
+                                    onerror="this.style.display='none'; this.previousElementSibling.style.display='block';">
+                            </span>
+                        </td>
+                        <td>${escapeHtml(record.sex)}</td>
+                        <td>${escapeHtml(record.year)}</td>
+                        <td class="id-cell">${escapeHtml(record.idNumber)}</td>
+                        <td>${escapeHtml(record.department)}</td>
+                        <td>${escapeHtml(record.campus)}</td>
+                        <td class="serial-cell">${escapeHtml(record.pcSerialNumber)}</td>
+                        <td class="model-cell psm no-print">${escapeHtml(record.pcModel)}</td>
+                        <td class="no-print text-center">
+                            <button class="btn btn-sm btn-primary" onclick="editStudent(${Number(record.id)})"><i class="bi bi-pencil"></i></button>
+                            <button class="btn btn-sm btn-danger" onclick="confirmDelete(${Number(record.id)})"><i class="bi bi-trash"></i></button>
+                            <button class="btn btn-sm btn-info" onclick="viewProfile(${Number(record.id)})"><i class="bi bi-info-circle"></i></button>
+                        </td>
+                    </tr>`;
+            }).join("");
+        }
+
+        searchForm.addEventListener("submit", function(event) {
+            event.preventDefault();
+        });
+
+        searchInput.addEventListener("input", function() {
+            clearTimeout(searchTimer);
+            const query = searchInput.value.trim();
+            searchTimer = setTimeout(function() {
+                fetch("display?live_search=1&query=" + encodeURIComponent(query), {
+                    headers: { "Accept": "application/json" }
+                })
+                    .then(function(response) {
+                        if (!response.ok) throw new Error("Search request failed");
+                        return response.json();
+                    })
+                    .then(function(data) {
+                        renderLiveRecords(data.records);
+                        recordsSummary.textContent = data.total
+                            ? "Showing " + data.total + " matching record" + (data.total === 1 ? "" : "s")
+                            : "No matching records";
+                        if (pagination) pagination.closest("nav").style.visibility = query ? "hidden" : "visible";
+                    })
+                    .catch(function() {
+                        recordsSummary.textContent = "Unable to update search results.";
+                    });
+            }, 250);
         });
     </script>
 </body>

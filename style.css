@@ -172,6 +172,21 @@ body {
     font-weight: 600;
 }
 
+.search-icon {
+    display: inline-flex;
+    align-items: center;
+    padding: 0 1.15rem;
+    color: #6366f1;
+    background: #fff;
+    font-size: 1.05rem;
+}
+
+.records-summary {
+    color: #475569;
+    font-weight: 600;
+    letter-spacing: .01em;
+}
+
 .search-box .btn:hover {
     background: #2980b9;
 }

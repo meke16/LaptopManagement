@@ -38,7 +38,7 @@ Frontend: HTML, CSS, JavaScript (Consider mentioning a framework like React, Vue
 
 Backend: PHP / Python (Django/Flask) / Node.js (Choose one)
 
-Database: MySQL / PostgreSQL
+Database: SQLite (`database.sqlite`, created automatically on first request)
 
 QR Code Generation: A library like qrcode (for Python) or endroid/qr-code (for PHP)
 
@@ -48,13 +48,15 @@ Version Control: Git & GitHub
 Follow these steps to set up the project locally for development and testing.
 
 Prerequisites
-A web server (e.g., XAMPP, WAMP, or LAMP stack)
+- A PHP 7.4+ web server with the PDO SQLite extension enabled
+- PHP's built-in server, Apache, or another PHP-compatible web server
 
-PHP 7.4+ / Python 3.8+ / Node.js 16+
+The application creates the SQLite database and required tables automatically. The initial administrator account is:
 
-MySQL 5.7+ / PostgreSQL
+- Email: `admin@gmail.com`
+- Password: `password`
 
-Composer / pip / npm (depending on your backend choice)
+Records are protected by login. After signing in, use **Edit Profile** to change the email and/or password.
 
 🧪 Usage
 
@@ -88,4 +90,3 @@ Cherinet Habtamu - meke16
 
 📞 Support
 For support, email habtamucherinet40@gmail.com or open an issue on the GitHub repository.
-

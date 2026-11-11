@@ -1,6 +1,7 @@
 <?php
-include 'connect.php';
-session_start();
+require_once __DIR__ . '/connect.php';
+require_once __DIR__ . '/auth.php';
+require_auth();
 $current_year = date('Y'); // Current year for filtering
 
 $limit = 10; // Number of records to show per page
@@ -28,7 +29,7 @@ $result = $conn->query($sql);
 
 // Handle AJAX student data request (for info)
 if (isset($_GET['get_student'])) {
-    $id = mysqli_real_escape_string($conn, $_GET['id']);
+    $id = (int)($_GET['id'] ?? 0);
     $sql = "SELECT * FROM student WHERE id = '$id'";
     $result = $conn->query($sql);
 
@@ -51,12 +52,12 @@ if (isset($_POST['submit'])) {
 
     $name = isset($_POST['name']) ? htmlspecialchars(ucwords(strtolower(trim($_POST['name'])))) : '';
     $sex = isset($_POST['sex']) ? $_POST['sex'] : '';
-    $idNumber = isset($_POST['idNumber']) ? mysqli_real_escape_string($conn, trim($_POST['idNumber'])) : '';
+    $idNumber = isset($_POST['idNumber']) ? trim($_POST['idNumber']) : '';
     $department = isset($_POST['department']) ? $_POST['department'] : '';
     $campus = isset($_POST['campus']) ? $_POST['campus'] : '';
-    $pcSerialNumber = isset($_POST['pcSerialNumber']) ? mysqli_real_escape_string($conn, trim($_POST['pcSerialNumber'])) : '';
-    $pcModel = isset($_POST['pcModel']) ? mysqli_real_escape_string($conn, trim($_POST['pcModel'])) : '';
-    $contact = isset($_POST['contact']) ? mysqli_real_escape_string($conn, trim($_POST['contact'])) : '';
+    $pcSerialNumber = isset($_POST['pcSerialNumber']) ? trim($_POST['pcSerialNumber']) : '';
+    $pcModel = isset($_POST['pcModel']) ? trim($_POST['pcModel']) : '';
+    $contact = isset($_POST['contact']) ? trim($_POST['contact']) : '';
     $year = isset($_POST['year']) ? $_POST['year'] : '';
 
     // Handle file upload (no changes needed)
@@ -131,7 +132,7 @@ if (isset($_POST['submit'])) {
 
 // Handle delete request
 if (isset($_GET['deleteid'])) {
-    $id = mysqli_real_escape_string($conn, $_GET['deleteid']);
+    $id = (int)$_GET['deleteid'];
 
     $sql = "DELETE  FROM student WHERE id='$id'";
     if ($conn->query($sql) === TRUE) {
@@ -159,7 +160,7 @@ if (isset($_POST['search']) && !empty(trim($_POST['search_query']))) {
         $term = trim($term);
         if (!empty($term)) {
             // Use prepared statements for complex logic or mysqli_real_escape_string for simple, manual escaping
-            $escapedTerm = mysqli_real_escape_string($conn, $term);
+            $escapedTerm = escape_sqlite_value($term);
             $whereConditions[] = "(name LIKE '%$escapedTerm%' OR idNumber LIKE '%$escapedTerm%')";
         }
     }
@@ -296,7 +297,7 @@ $department = array(
 
     <header class="header text-center no-print">
         <h1>PC Checkup System</h1>
-        <p style="text-decoration: underline white;" class="lead mt-2">Haramaya University - <?php echo $current_year; ?></p>
+        <p class="lead mt-2">Haramaya University <span class="year-badge"><?= $current_year ?></span></p>
     </header>
 
     <div class="d-flex justify-content-center align-items-center flex-wrap my-3 no-print">
@@ -347,107 +348,129 @@ $department = array(
             </div>
         <?php endif; ?>
 
-        <div class="d-flex justify-content-between mb-4 no-print buto1">
+        <div class="d-flex justify-content-between align-items-center gap-2 mb-4 no-print buto1">
             <a href="home" class="btn btn-secondary">
                 <i class="bi bi-arrow-left"></i> Go Back
             </a>
-            <button class="btn btn-primary" onclick="window.print()">
-                <i class="bi bi-printer"></i> Print
+            <div class="d-flex gap-2">
+                <a href="/profile" class="btn btn-outline-light">
+                    <i class="bi bi-person-gear"></i> Edit Profile
+                </a>
+                <a href="/logout" class="btn btn-outline-danger">
+                    <i class="bi bi-box-arrow-right"></i> Log out
+                </a>
+                <button class="btn btn-primary" onclick="window.print()">
+                    <i class="bi bi-printer"></i> Print
+                </button>
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center rounded p-3 mb-3 no-print records-toolbar">
+            <div>
+                <h2 class="h5 text-white mb-1">Computer Records</h2>
+                <p class="text-white-50 mb-0">Manage registered student devices.</p>
+            </div>
+            <button id="toggleFormBtn" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#studentModal" type="button">
+                <i class="bi bi-person-plus"></i> Add New Record
             </button>
         </div>
 
-        <div  style="background: #0f0e0eff;" class="form-container">
-            <button id="toggleFormBtn" class="btn btn-primary mb-4 no-print" data-bs-toggle="collapse" data-bs-target="#studentForm">
-                <i class="bi bi-person-plus"></i> Add New Record
-            </button>
-
-            <div id="studentForm" class="collapse">
-                <form autocomplete="off" id="form1" method="POST" class="row g-3 needs-validation" novalidate enctype="multipart/form-data">
+        <div class="modal fade" id="studentModal" tabindex="-1" aria-labelledby="studentModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title" id="studentModalLabel"><i class="bi bi-person-plus me-2"></i>Add New Record</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <form autocomplete="off" id="form1" method="POST" class="needs-validation" novalidate enctype="multipart/form-data">
                     <input type="hidden" name="edit_id" id="edit_id" value="0">
                     <input type="hidden" name="is_edit" id="is_edit" value="0">
 
-                    <div class="col-md-6">
-                        <label class="form-label">Full Name</label>
-                        <input placeholder="John Doe" type="text" class="form-control" name="name" id="name" required>
-                        <div class="invalid-feedback">Please enter student's name.</div>
+                    <div class="modal-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label" for="name">Full Name</label>
+                                <input placeholder="John Doe" type="text" class="form-control" name="name" id="name" required>
+                                <div class="invalid-feedback">Please enter student's name.</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="sex">Gender</label>
+                                <select class="form-select" name="sex" id="sex" required>
+                                    <option value="" selected disabled>Select gender</option>
+                                    <option value="Male">Male</option>
+                                    <option value="Female">Female</option>
+                                </select>
+                                <div class="invalid-feedback">Please select gender.</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="idNumber">ID Number</label>
+                                <input placeholder="0998/16" type="text" class="form-control" name="idNumber" id="idNumber" required minlength="4">
+                                <div class="invalid-feedback">Please enter an ID number with at least 4 characters.</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="department">Department</label>
+                                <select class="form-select" id="department" name="department" required>
+                                    <option value="" selected disabled>Select a Department</option>
+                                    <?php foreach ($department as $dep) : ?>
+                                        <option value="<?= htmlspecialchars($dep, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($dep, ENT_QUOTES, 'UTF-8') ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <div class="invalid-feedback">Please select a department.</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="campus">Campus</label>
+                                <select class="form-select" name="campus" id="campus" required>
+                                    <option value="" selected disabled>Select Campus</option>
+                                    <option value="Main">Main</option>
+                                    <option value="HiT">HiT</option>
+                                    <option value="Station">Station</option>
+                                    <option value="Harar">Harar</option>
+                                </select>
+                                <div class="invalid-feedback">Please choose a campus.</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="pcSerialNumber">PC Serial Number</label>
+                                <input placeholder="5#1234555" type="text" class="form-control" name="pcSerialNumber" id="pcSerialNumber" required>
+                                <div class="invalid-feedback">Please enter the PC serial number.</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="pcModel">PC Model</label>
+                                <input placeholder="HP EliteBook" type="text" class="form-control" name="pcModel" id="pcModel">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="contact">Contact Number</label>
+                                <input placeholder="099918272" type="tel" class="form-control" name="contact" id="contact">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="year">Year</label>
+                                <select class="form-select" id="year" name="year" required>
+                                    <option value="" selected disabled>Select Year</option>
+                                    <?php for ($i = 1; $i <= 7; $i++): ?>
+                                        <option value="<?= $i ?>">Year <?= $i ?></option>
+                                    <?php endfor; ?>
+                                </select>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label" for="photo">Photo (Optional)</label>
+                                <input type="file" class="form-control" name="photo" id="photo" accept="image/jpeg, image/png">
+                                <div class="form-text">Only JPG and PNG images are accepted.</div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Gender</label>
-                        <select class="form-select" name="sex" id="sex" required>
-                            <option value="" selected disabled>Select gender</option>
-                            <option value="Male">Male</option>
-                            <option value="Female">Female</option>
-                        </select>
-                        <div class="invalid-feedback">Please select gender.</div>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">ID Number</label>
-                        <input placeholder="0998/16" type="text" class="form-control" name="idNumber" id="idNumber" required minlength="4">
-                        <div class="invalid-feedback">Please enter correct ID number.</div>
-                        <div class="form-text">Id number at least 4 charachter long.</div>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label" for="department">Department</label>
-                        <select class="form-select" id="department" name="department" required>
-                            <option value="" selected disabled>Select a Department</option>
-                            <?php foreach ($department as $dep) : ?>
-                                <option value="<?= $dep ?>" <?= (isset($student['department']) && $student['department'] == $dep) ? 'selected' : '' ?>>
-                                    <?= $dep ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                        <div class="invalid-feedback">Please select a department.</div>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Campus</label>
-                        <select class="form-select" name="campus" id="campus" required>
-                            <option value="" selected disabled>Select Campus</option>
-                            <option value="Main">Main</option>
-                            <option value="HiT">HiT</option>
-                            <option value="Station">Station</option>
-                            <option value="Harar">Harar</option>
-                        </select>
-                        <div class="invalid-feedback">Please choose campus.</div>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">PC Serial Number</label>
-                        <input placeholder="5#1234555" type="text" class="form-control" name="pcSerialNumber" id="pcSerialNumber" required>
-                        <div class="invalid-feedback">Please enter PC serial number.</div>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">PC Model</label>
-                        <input placeholder="Hp-Elitebbok" type="text" class="form-control" name="pcModel" id="pcModel">
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Contact Number</label>
-                        <input placeholder="099918272" type="tel" class="form-control" name="contact" id="contact">
-                    </div>
-                    <div class="col-md-6">
-                        <label for="year" class="form-label">Year </label>
-                        <select class="form-select" id="year" name="year" required>
-                            <option value="" selected disabled>Select Year</option>
-                            <?php for ($i = 1; $i <= 7; $i++): ?>
-                                <option value="<?= $i ?>">Year <?= $i ?></option>
-                            <?php endfor; ?>
-                        </select>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Photo (Optional)</label>
-                        <input type="file" class="form-control" name="photo" id="photo" accept="image/jpeg, image/png">
-                        <div class="form-text">Only JPG/PNG images accepted</div>
-                    </div>
-                    <div class="col-12">
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                         <button id="change" type="submit" class="btn btn-success" name="submit">
                             <i class="bi bi-save"></i> Save Record
                         </button>
                     </div>
                 </form>
+                </div>
             </div>
         </div>
 
         <div  class="search-box no-print my-3">
             <form method="POST" class="input-group">
-                <input style="background: #e27917ff;" autocomplete="off" type="search" class="form-control" placeholder="Search by name or ID..."
+                <input autocomplete="off" type="search" class="form-control" placeholder="Search by name or ID..."
                     name="search_query" value="<?php echo htmlspecialchars($searchQuery); ?>">
                 <button type="submit" class="btn btn-primary" name="search">
                     <i class="bi bi-search"></i> Search
@@ -505,15 +528,15 @@ $department = array(
                                 </td>
                                 <td><?= htmlspecialchars($sex); ?></td>
                                 <td><?= htmlspecialchars($year); ?></td>
-                                <td style="color:rgb(10, 127, 35); font-weight: bolder;">
+                                <td class="id-cell">
                                     <?= htmlspecialchars($idNumber); ?>
                                 </td>
                                 <td><?= htmlspecialchars($department); ?></td>
                                 <td><?= htmlspecialchars($campus); ?></td>
-                                <td style="color: blue; font-weight: bolder;">
+                                <td class="serial-cell">
                                     <?= htmlspecialchars($pcSerialNumber); ?>
                                 </td>
-                                <td style="color: red;" class="psm no-print">
+                                <td class="model-cell psm no-print">
                                     <?= htmlspecialchars($pcModel); ?>
                                 </td>
 
@@ -585,41 +608,6 @@ $department = array(
             <div id="profileContent"></div>
         </div>
     </div>
-    <!-- Footer Section -->
-    <footer class="footer">
-        <div class="container">
-            <div class="footer-content">
-                <div class="footer-logo">
-                    <h3 class="text-gradient">Haramaya University</h3>
-                    <p>Excellence in Education, Research, and Community Service</p>
-                    <p><small>PC Checkup Management System</small></p>
-                </div>
-
-                <div class="footer-links">
-                    <h4>Quick Links</h4>
-                    <ul>
-                        <li><a href="home"><i class="bi bi-house-fill"></i> Home</a></li>
-                        <li><a href="display.php"><i class="bi bi-list-check"></i> Records</a></li>
-                        <li><a href="#"><i class="bi bi-info-circle"></i> About</a></li>
-                        <li><a href="#"><i class="bi bi-headset"></i> Support</a></li>
-                    </ul>
-                </div>
-
-                <div class="footer-contact">
-                    <h4>Contact Info</h4>
-                    <p><i class="bi bi-geo-alt-fill"></i> Harar, Ethiopia</p>
-                    <p><i class="bi bi-telephone-fill"></i> +251 (0)25 553 0333</p>
-                    <p><i class="bi bi-envelope-fill"></i> info@haramaya.edu.et</p>
-                    <p><i class="bi bi-globe"></i> www.haramaya.edu.et</p>
-                </div>
-            </div>
-
-            <div class="footer-bottom">
-                <p>&copy; <?php echo date('Y'); ?> Haramaya University - PC Checkup System. All rights reserved.</p>
-                <p class="mt-1">Developed with <i class="bi bi-heart-fill text-danger"></i> for Academic Excellence</p>
-            </div>
-        </div>
-    </footer>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         // View student profile
@@ -734,19 +722,9 @@ $department = array(
                         $('#year').val(student.year);
 
 
-                        $('#studentForm').collapse('show');
-
-                        // Scroll to the form
-                        $('html, body').animate({
-                            scrollTop: $('#studentForm').fadeIn()
-                        }, 500);
-
-                        // Change form title
-                        $('#toggleFormBtn').html('<i class="bi bi-pencil"></i> Edit Student');
+                        $('#studentModalLabel').html('<i class="bi bi-pencil me-2"></i>Edit Student');
                         $('#change').html('<i class="bi bi-pencil"></i> Save Changes');
-
-
-
+                        bootstrap.Modal.getOrCreateInstance(document.getElementById('studentModal')).show();
 
                     } catch (e) {
                         console.error('Error parsing student data:', e);
@@ -769,13 +747,22 @@ $department = array(
                 bootstrapAlert2.close();
             }
         }, 3000);
-        document.getElementById("form1").onsubmit = function(event) {
-            var idNumber = document.getElementById("idNumber").value;
-            if (idNumber.length < 4) {
-                alert("The ID number must be at least 4 characters long.");
-                event.preventDefault(); // Prevent form submission
+        document.getElementById("form1").addEventListener("submit", function(event) {
+            if (!this.checkValidity() || document.getElementById("idNumber").value.length < 4) {
+                event.preventDefault();
+                event.stopPropagation();
             }
-        };
+            this.classList.add("was-validated");
+        });
+
+        document.getElementById("toggleFormBtn").addEventListener("click", function() {
+            document.getElementById("form1").reset();
+            document.getElementById("edit_id").value = "0";
+            document.getElementById("is_edit").value = "0";
+            document.getElementById("studentModalLabel").innerHTML = '<i class="bi bi-person-plus me-2"></i>Add New Record';
+            document.getElementById("change").innerHTML = '<i class="bi bi-save"></i> Save Record';
+            document.getElementById("form1").classList.remove("was-validated");
+        });
     </script>
 </body>
 </body>

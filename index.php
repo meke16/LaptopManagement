@@ -6,6 +6,9 @@ $routes = [
     '/' => 'home.php',
     '/home' => 'home.php',
     '/display' => 'display.php',
+    '/login' => 'login.php',
+    '/profile' => 'profile.php',
+    '/logout' => 'logout.php',
     '/update' => 'update.php',
 ];
 

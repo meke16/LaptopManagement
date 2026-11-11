@@ -1,5 +1,4 @@
 <?php
-session_start();
 $current_year = date('Y');
 ?>
 <!DOCTYPE html>
@@ -29,9 +28,6 @@ $current_year = date('Y');
                         <a class="nav-link active" href="home">Home</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="display">Records</a>
-                    </li>
-                    <li class="nav-item">
                         <a class="nav-link" href="#about">About</a>
                     </li>
                     <li class="nav-item">
@@ -50,14 +46,6 @@ $current_year = date('Y');
                 <p class="hero-subtitle">Haramaya University - Computer Management Solution</p>
                 <p class="lead mb-4">Streamlining computer inventory management and maintenance tracking for academic excellence</p>
                 
-                <div class="cta-buttons">
-                    <a href="display" class="btn btn-cta btn-lg">
-                        <i class="bi bi-list-check me-2"></i>View All Records
-                    </a>
-                    <a href="display" class="btn btn-cta btn-lg">
-                        <i class="bi bi-person-plus me-2"></i>Add New Record
-                    </a>
-                </div>
             </div>
         </div>
     </section>
@@ -72,7 +60,7 @@ $current_year = date('Y');
             
             <div class="row g-4">
                 <div class="col-md-4">
-                    <a href="display" class="action-card fade-in-up">
+                    <div class="action-card fade-in-up">
                         <div class="action-icon">
                             <i class="bi bi-person-plus"></i>
                         </div>
@@ -80,11 +68,11 @@ $current_year = date('Y');
                         <p class="action-description">
                             Register new computer assignments for students with detailed specifications and contact information.
                         </p>
-                    </a>
+                    </div>
                 </div>
                 
                 <div class="col-md-4">
-                    <a href="display" class="action-card fade-in-up">
+                    <div class="action-card fade-in-up">
                         <div class="action-icon">
                             <i class="bi bi-search"></i>
                         </div>
@@ -92,11 +80,11 @@ $current_year = date('Y');
                         <p class="action-description">
                             Quickly find student records by name, ID number, or computer serial number with advanced search.
                         </p>
-                    </a>
+                    </div>
                 </div>
                 
                 <div class="col-md-4">
-                    <a href="display" class="action-card fade-in-up">
+                    <div class="action-card fade-in-up">
                         <div class="action-icon">
                             <i class="bi bi-printer"></i>
                         </div>
@@ -104,7 +92,7 @@ $current_year = date('Y');
                         <p class="action-description">
                             Print comprehensive reports of computer assignments for administrative and archival purposes.
                         </p>
-                    </a>
+                    </div>
                 </div>
             </div>
         </div>
@@ -204,7 +192,6 @@ $current_year = date('Y');
                     <h4>Quick Links</h4>
                     <ul>
                         <li><a href="home"><i class="bi bi-house-fill"></i> Home</a></li>
-                        <li><a href="display"><i class="bi bi-list-check"></i> Records</a></li>
                         <li><a href="#"><i class="bi bi-info-circle"></i> About</a></li>
                         <li><a href="#"><i class="bi bi-headset"></i> Support</a></li>
                     </ul>

@@ -154,11 +154,12 @@ if (isset($_POST['submit'])) {
 if (isset($_GET['deleteid'])) {
     $id = (int)$_GET['deleteid'];
 
-    $sql = "DELETE  FROM student WHERE id='$id'";
-    if ($conn->query($sql) === TRUE) {
+    $sql = "DELETE FROM student WHERE id='$id'";
+    try {
+        $conn->query($sql);
         $_SESSION['success'] = "Student record deleted successfully";
-    } else {
-        $_SESSION['error'] = "Error deleting student record: " . $conn->error;
+    } catch (Throwable $exception) {
+        $_SESSION['error'] = "Error deleting student record.";
     }
     header("Location: display.php");
     exit();

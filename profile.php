@@ -7,6 +7,19 @@ require_auth();
 
 $error = '';
 $success = '';
+$currentUser = $conn->pdo()->prepare('SELECT id, email FROM users WHERE id = ?');
+$currentUser->execute([(int)$_SESSION['user_id']]);
+$user = $currentUser->fetch();
+
+if (!$user) {
+    session_unset();
+    header('Location: login.php');
+    exit();
+}
+
+$_SESSION['user_id'] = (int)$user['id'];
+$_SESSION['user_email'] = $user['email'];
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = trim((string)($_POST['email'] ?? ''));
     $password = (string)($_POST['password'] ?? '');
@@ -23,19 +36,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $conn->pdo()->beginTransaction();
             if ($password === '') {
                 $statement = $conn->pdo()->prepare('UPDATE users SET email = ? WHERE id = ?');
-                $statement->execute([$email, $_SESSION['user_id']]);
+                $statement->execute([$email, $user['id']]);
             } else {
                 $statement = $conn->pdo()->prepare('UPDATE users SET email = ?, password = ? WHERE id = ?');
-                $statement->execute([$email, password_hash($password, PASSWORD_DEFAULT), $_SESSION['user_id']]);
+                $statement->execute([$email, password_hash($password, PASSWORD_DEFAULT), $user['id']]);
+            }
+            if ($statement->rowCount() === 0 && $email !== $user['email']) {
+                throw new RuntimeException('The current user account could not be updated.');
             }
             $conn->pdo()->commit();
             $_SESSION['user_email'] = $email;
             $success = 'Profile updated successfully.';
-        } catch (PDOException $exception) {
+        } catch (Throwable $exception) {
             if ($conn->pdo()->inTransaction()) {
                 $conn->pdo()->rollBack();
             }
-            $error = 'That email address is already in use.';
+            $error = $exception instanceof PDOException && str_contains(strtolower($exception->getMessage()), 'unique')
+                ? 'That email address is already in use.'
+                : 'Unable to update the current profile.';
         }
     }
 }
@@ -56,7 +74,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <?php if ($success): ?><div class="alert alert-success"><?= htmlspecialchars($success, ENT_QUOTES, 'UTF-8') ?></div><?php endif; ?>
             <form method="post" autocomplete="off">
                 <label class="form-label" for="email">Email</label>
-                <input class="form-control mb-3" id="email" name="email" type="email" value="<?= htmlspecialchars($_SESSION['user_email'], ENT_QUOTES, 'UTF-8') ?>" required>
+                <input class="form-control mb-3" id="email" name="email" type="email" value="<?= htmlspecialchars($user['email'], ENT_QUOTES, 'UTF-8') ?>" required>
                 <label class="form-label" for="password">New password</label>
                 <input class="form-control mb-3" id="password" name="password" type="password" minlength="6">
                 <label class="form-label" for="confirm_password">Confirm new password</label>
